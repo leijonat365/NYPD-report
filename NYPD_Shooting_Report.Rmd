@@ -1,0 +1,238 @@
+---
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```markdown
+---
+title: "NYPD Shooting Report"
+
+date: '2024-06-19'
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+## Step 1: Load Dataset
+
+### Description
+
+__NYPD Shooting Incident Data (Historic)__
+
+
+__Source__: [NYPD Shooting Incident Data (Historic)](https://catalog.data.gov/dataset/nypd-shooting-incident-data-historic)
+
+
+### Column Description
+
+- __INCIDENT_KEY__: Randomly generated persistent ID for each incident.
+- __OCCUR_DATE__: Exact date of shooting incident.
+- __OCCUR_TIME__: Exact time of the shooting incident.
+- __BORO__: Borough where the shooting incident occurred.
+- __STATISTICAL_MURDER_FLAG__: Indicates whether the shooting resulted in the victim's death (TRUE if fatal).
+- __PERP_AGE_GROUP__: Perpetrator's age group.
+- __PERP_SEX__: Perpetrator's sex.
+- __PERP_RACE__: Perpetrator's race.
+- __VIC_AGE_GROUP__: Victim's age group.
+- __VIC_SEX__: Victim's sex.
+- __VIC_RACE__: Victim's race.
+
+### Import Dataset
+
+```{r import_data, message=FALSE, warning=FALSE}
+
+library(tidyverse)
+library(lubridate)
+library(ggplot2)
+
+url <- "https://data.cityofnewyork.us/api/views/833y-fsy8/rows.csv"
+
+shootings <- read_csv(url)
+
+glimpse(shootings)  # View structure of the dataset
+```
+
+## Step 2: Tidy and Transform Data
+
+
+```{r remove_columns}
+
+shootings <- shootings %>%
+  select(-c(PRECINCT, JURISDICTION_CODE, LOCATION_DESC, X_COORD_CD, Y_COORD_CD, Lon_Lat))
+
+```
+
+### Convert Data Types
+
+Convert OCCUR_DATE to date object.
+
+```{r convert_date}
+
+shootings <- shootings %>%
+  mutate(OCCUR_DATE = mdy(OCCUR_DATE))
+
+```
+
+### Convert Variables to Factors
+
+```{r convert_factors}
+
+shootings <- shootings %>%
+  mutate(
+    BORO = factor(BORO),
+    PERP_AGE_GROUP = factor(PERP_AGE_GROUP),
+    PERP_SEX = factor(PERP_SEX),
+    PERP_RACE = factor(PERP_RACE),
+    VIC_AGE_GROUP = factor(VIC_AGE_GROUP),
+    VIC_SEX = factor(VIC_SEX),
+    VIC_RACE = factor(VIC_RACE),
+    STATISTICAL_MURDER_FLAG = factor(STATISTICAL_MURDER_FLAG)
+  )
+
+```
+
+## Step 3: Add Visualizations and Analysis
+
+
+```{r fatal_flag}
+
+table(shootings$STATISTICAL_MURDER_FLAG)
+
+```
+
+### Victim Age
+
+```{r victim_age}
+
+table(shootings$STATISTICAL_MURDER_FLAG, shootings$VIC_AGE_GROUP)
+
+```
+
+```{r bar_victim_age}
+
+shootings %>%
+  filter(STATISTICAL_MURDER_FLAG == FALSE) %>%
+  ggplot(aes(x = VIC_AGE_GROUP)) +
+  geom_bar(fill = "#0F8DC0") +
+  theme_bw() +
+  labs(x = "Victim Age Group",
+       y = "Non-Fatal Shooting Incidents",
+       title = "Non-Fatal Shooting Incidents by Victim Age Group")
+
+shootings %>%
+  filter(STATISTICAL_MURDER_FLAG == TRUE) %>%
+  ggplot(aes(x = VIC_AGE_GROUP)) +
+  geom_bar(fill = "#0F8DC0") +
+  theme_bw() +
+  labs(x = "Victim Age Group",
+       y = "Fatal Shooting Incidents",
+       title = "Fatal Shooting Incidents by Victim Age Group")
+
+```
+
+### Victim Sex
+
+```{r victim_sex}
+
+table(shootings$STATISTICAL_MURDER_FLAG, shootings$VIC_SEX)
+
+```
+
+```{r bar_victim_sex}
+
+shootings %>%
+  filter(STATISTICAL_MURDER_FLAG == FALSE) %>%
+  ggplot(aes(x = fct_infreq(VIC_SEX))) +
+  geom_bar(stat = 'count') +
+  geom_bar(fill = "#48308C") +
+  theme_bw() +
+  labs(x = "Victim Sex",
+       y = "Non-Fatal Shooting Incidents",
+       title = "Non-Fatal Shooting Incidents by Victim Sex")
+
+shootings %>%
+  filter(STATISTICAL_MURDER_FLAG == TRUE) %>%
+  ggplot(aes(x = fct_infreq(VIC_SEX))) +
+  geom_bar(stat = 'count') +
+  geom_bar(fill = "#48308C") +
+  theme_bw() +
+  labs(x = "Victim Sex",
+       y = "Fatal Shooting Incidents",
+       title = "Fatal Shooting Incidents by Victim Sex")
+
+```
+
+### Victim Race
+
+```{r victim_race}
+
+table(shootings$STATISTICAL_MURDER_FLAG, shootings$VIC_RACE)
+
+```
+
+```{r bar_victim_race}
+
+shootings %>%
+  filter(STATISTICAL_MURDER_FLAG == FALSE) %>%
+  ggplot(aes(x = fct_infreq(VIC_RACE))) +
+  geom_bar(stat = 'count') +
+  geom_bar(fill = "#23A43B") +
+  coord_flip() +
+  theme_bw() +
+  labs(x = "Victim Race",
+       y = "Non-Fatal Shooting Incidents",
+       title = "Non-Fatal Shooting Incidents by Victim Race")
+
+shootings %>%
+  filter(STATISTICAL_MURDER_FLAG == TRUE) %>%
+  ggplot(aes(x = fct_infreq(VIC_RACE))) +
+  geom_bar(stat = 'count') +
+  geom_bar(fill = "#23A43B") +
+  coord_flip() +
+  theme_bw() +
+  labs(x = "Victim Race",
+       y = "Fatal Shooting Incidents",
+       title = "Fatal Shooting Incidents by Victim Race")
+
+```
+
+### Multivariable Logistic Regression Model
+
+```{r vic_model}
+
+glm_model <- glm(STATISTICAL_MURDER_FLAG ~ VIC_AGE_GROUP + VIC_SEX + VIC_RACE, data = shootings, family = 'binomial')
+
+summary(glm_model)
+
+```
+
+### Conclusion
+
+Through the analysis of NYPD shooting incident data, this report aimed to determine whether demographic factors such as age, sex, or race of the victim could predict the likelihood of a shooting being fatal. The findings indicate that victim age group emerges as a significant predictor of the outcome of shooting incidents. Specifically, younger victims, particularly those in the age groups under 18 and 18-24, exhibit higher survival rates compared to older age groups. Conversely, shootings involving victims aged 65 and above are more likely to result in fatalities.
+
+The analysis also explored the roles of victim sex and race in shooting outcomes. While there are disparities in the distribution of incidents across these demographics, particularly with a higher incidence among males and certain racial groups, these factors alone did not show a clear predictive relationship with fatality outcomes once controlled for other variables.
+
+The multivariable logistic regression model reinforced the significance of victim age group in predicting fatality, suggesting that age-related physiological factors and potentially different circumstances surrounding incidents involving different age groups may influence survival rates.
+
+### Recommendations for Further Investigation
+
+To further enhance predictive models and deepen understanding of shooting incidents, future investigations could consider integrating additional variables such as location-specific factors (e.g., neighborhood demographics, economic conditions, policing practices) and situational variables (e.g., time of day, presence of firearms). Such factors could provide a more nuanced view of the complex dynamics influencing shooting outcomes in urban environments.
+
+### Sources of Bias
+
+While efforts were made to maintain objectivity throughout the analysis, it's important to acknowledge potential biases inherent in the data and analysis process. These biases could stem from limitations in data collection methodologies, inherent societal biases reflected in crime reporting and policing practices, as well as the researcher's own perspectives and interpretations.
+
+### Implications for Policy and Community Action
+
+The insights from this study underscore the importance of targeted interventions aimed at reducing gun violence and improving emergency response strategies, particularly for vulnerable age groups identified in the analysis. Policies focusing on youth engagement, community policing, and firearm regulations tailored to high-risk areas and demographic groups could potentially mitigate the impact of gun violence and improve overall public safety.
+
+In conclusion, while victim demographics, particularly age, provide valuable insights into the outcomes of shooting incidents, a comprehensive understanding requires consideration of a broader range of factors. Continued research and data-driven approaches are essential for developing effective strategies to prevent gun violence and ensure safer communities for all residents.
+```
+
